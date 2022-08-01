@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Survival to 65</title>
+  <script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+
+</style>
+
+</head>
+
+
+<body onload="loadpage()">
+
+<ul>
+  <li><a id="page1" onclick="loadPage1()">Scene 1</a></li>
+  <li><a id="page2" onclick="loadPage2()">Scene 2</a></li>
+  <li><a id="page3" onclick="loadPage3()">Scene 3</a></li>
+  <li><a id="page4" onclick="loadPage4()">Scene 4</a></li>
+</ul>
+<div class="leftcolumn">
+    <div class="card">
+      <h2 id="graph_title"></h2>
+
+
+      <div id="svg_viz" class="svg_viz">
+        <svg width="1100" height="600"></svg>
+      </div>
+      
+         <div id="caption_box">
+          </br>
+          </div>
+
+    </div>
+  </div>
+<div class="rightcolumn">
+    <div id="filter_country" >
+      <div>
+        <button type="button" class="button" onclick="clear_graph()"><a>Clear</a></button>
+      </br></br></br>
+        <b>Add Country</b>
+        </br></br>
+        <select id="selectButton" onChange="addGraph(this.options[this.selectedIndex].value)"></select>
+
+      </div>
+            </br></br></br>
+        <b>Filter by gender</b>
+            </br></br>
+
+      <input type="checkbox" id="enable_male" onclick="refreshGraph()" name="enable_male" value="enable_male" checked>
+      <label for="vehicle1"> Male</label><br>
+      <input type="checkbox" id="enable_female" onclick="refreshGraph()" name="enable_female" value="enable_female" checked>
+      <label for="vehicle2"> Female</label><br>
+      <div id="filter_container" class="filter_with_scroll">
+         
+      </div>
+    </div>
+
+<script>
+    var male,female,world_average,requested_page, page_id,countries, selected_countries, xScale, yScale;
+
+    function loadpage() {
+        const url_parameters = new URLSearchParams(window.location.search);
+         requested_page = url_parameters.get('pageid');
+        if(requested_page == null) {
+          requested_page = 1;
+        }
+        var page_id = ('page') + requested_page;
+        document.getElementById(page_id).classList.add('active');
+        if(requested_page != 4) {
+          document.getElementById("filter_country").style.display = "none";
+          document.getElementById("selectButton").style.display = "none";
+
+        }
+
+
+        male = new Map();
+        female = new Map();
+        countries = [];
+        selected_countries = new Set();
+        d3.csv("./data/WDI_Survival_till_65.csv", function(data) {
+          for (var i = 0; i < data.length; i++) {
+              var country = data[i]['Country Name'];
+              countries[i]=country;
+              const values = [];
+              for (var j = 1960; j <= 2021; j++) {
+                var percentage = parseFloat(data[i][''+ j]);
+                if(percentage) {
+                  values[j-1960] = [j, percentage];
+                }
+              }
+              if(data[i]['Indicator Code'] == 'SP.DYN.TO65.FE.ZS') {
+                female.set(country, values);
+              } else {
+                male.set(country, values);
+              }
+          }
+
+          // Compute averages
+          var male_world = male.get('World');
+          var female_world = female.get('World');
+          // console.log(male_world);
+          // console.log(female_world);
+          world_average = [];
+           for (var j = 1960; j <= 2021; j++) {
+            if(male_world[j-1960] && female_world[j-1960]) {
+              var avg = (male_world[j-1960][1] + female_world[j-1960][1])/2;
+              world_average[j-1960] = [j, avg];            
+            }
+           }
+
+          //console.log("Male data: " + male);
+          //console.log("Female data: " + female);
+          drawPage();
+        });
+      }
+
+      function addGraph(country) {
+        if(!selected_countries.has(country)) {
+            drawMaleAndFemale(country);
+            refreshGraph();
+        }
+      }
+
+
+      function clear_graph() {
+        
+        //console.log(selected_countries);
+        for (const country of selected_countries) {
+          //console.log("removing " + getId('M:'+ country));
+          d3.select('#' + getId('M:'+ country)).remove();
+          d3.select('#' + getId('F:'+ country)).remove();
+        }
+        selected_countries.clear();
+      }
+
+    function refreshGraph() {
+       // console.log(selected_countries);
+        var enable_male = document.getElementById("enable_male");
+        var enable_female = document.getElementById("enable_female");
+
+        for (const country of selected_countries) {
+         // console.log("removing " + getId('M:'+ country));
+          if (enable_male.checked == true){
+            d3.select('#' + getId('M:'+ country)).style("opacity", 1);
+          } else {
+            d3.select('#' + getId('M:'+ country)).style("opacity", 0);
+          }
+          
+          if (enable_female.checked == true){
+            d3.select('#' + getId('F:'+ country)).style("opacity", 1);
+          } else {
+            d3.select('#' + getId('F:'+ country)).style("opacity", 0);
+          }
+        }
+      }
+
+
+
+
+      function drawPage() {
+        var graph_title, notes;
+
+
+        if(requested_page == 1) {
+            graph_title = "Survival to 65 for the world's population";
+            notes = "* Survival Rates to the age of 65 have been steadily increasing from 1960 to 2021 </br> * The rate of increase has gradually 77.89% in 2020 </br> * The rate of increase has been slowing down after 70% incicating that it may be platued."
+            drawGraph(world_average, "#CC0000", 0,'World', 'World');
+            annotatePage1()
+        }
+        if(requested_page == 2) {
+            graph_title = "Survival to 65 for the world's population for Male and Female";
+            notes = "* Females have consistently shown a hiher survial rates then males </br> * The rate of increase is consistent among the year beetween male and female </br> * Gender plays a role in a person's survival to 65, but over the year the proportion of this impact has not changed."
+            drawMaleAndFemale('World',"#0a4a90");
+        }
+        if(requested_page == 3) {
+            graph_title = "Survival to 65 for the world's population for different Income Groups";
+             notes = "* Difference in the survial percentage is evident between income groups </br> * Starting from 1997, the low income groups have shown a significant increase in survival percentage </br> * Females among each income group have a higher survival percentage, and over the year that difference has remain consistent."
+            drawMaleAndFemale('Low income',"#f46d43");
+            drawMaleAndFemale('Middle income',"#4575b4");
+            drawMaleAndFemale('High income',"green");
+            annotatePage3();
+        }
+
+        if(requested_page == 4) {
+            graph_title = "Explore the data across different countries and by gender ";
+            notes = ""
+            drawMaleAndFemale('United States',"#f46d43");
+            drawMaleAndFemale('Afghanistan',"green");
+           // console.log(countries);
+          d3.select("#selectButton")
+          .selectAll('myOptions')
+            .data(countries)
+            .enter()
+            .append('option')
+            .text(function (d) { return d; }) // text showed in the menu
+            .attr("value", function (d) { return d; }) // corresponding value returned by the button
+          }
+          document.getElementById("graph_title").innerHTML= graph_title;
+          document.getElementById("caption_box").innerHTML= notes;
+
+      }
+
+      function annotatePage1() {
+
+        var group = d3.select("#svg_viz")
+            .select("svg")
+            .append("g");
+
+        
+        group.append('rect')
+            .attr("x", xScale(1971))
+            .attr("y", yScale(56.32864573)-160)
+            .attr('width', 400)
+            .attr('height', 40)
+            .attr('rx', 8)
+            .attr('ry', 8)
+            .attr("fill", "#04AA6D");
+
+        group.append("text")
+            .attr("x", xScale(1971)+10)
+            .attr("y", yScale(56.32864573)-135)
+            .attr("class", "annotationText")
+            .style('font','15px Helvetica')
+            .text("Initial years show the steepest rise in the survival rates");
+        group
+            .append("line")
+            .attr("opacity", 1)
+            .attr("style", "stroke:rgb(0,0,0);stroke-width:0.5px")
+            .attr("x1", xScale(1970)+100)
+            .attr("y1", yScale(58.33489281)+100)
+            .attr("x2", xScale(1971)+120)
+            .attr("y2", yScale(56.32864573)-120);
+
+        group
+            .append("line")
+            .attr("opacity", 1)
+            .attr("style", "stroke:rgb(0,0,0);stroke-width:0.5px")
+            .attr("x1", xScale(1960)+100)
+            .attr("y1", yScale(49.33489281)+100)
+            .attr("x2", xScale(1971)+120)
+            .attr("y2", yScale(56.32864573)-120);
+
+      }
+
+      function annotatePage3() {
+
+        var group = d3.select("#svg_viz")
+            .select("svg")
+            .append("g");
+
+        
+        group.append('rect')
+            .attr("x", xScale(2005))
+            .attr("y", yScale(30.32864573) + 50)
+            .attr('width', 400)
+            .attr('height', 80)
+            .attr('rx', 8)
+            .attr('ry', 8)
+            .attr("fill", "#3e8e41");
+
+        group.append("text")
+            .attr("x", xScale(2005)+10)
+            .attr("y", yScale(30.32864573) + 80)
+            .attr("class", "annotationText")
+            .style('font','15px Helvetica')
+            .text("[1985-1995] Lower income groups did not increase much, ");
+        group.append("text")
+            .attr("x", xScale(2005)+10)
+            .attr("y", yScale(30.32864573) + 100)
+            .attr("class", "annotationText")
+            .style('font','15px Helvetica')
+            .text("after which it rises significantly ");
+        group
+            .append("line")
+            .attr("opacity", 1)
+            .attr("style", "stroke:rgb(0,0,0);stroke-width:0.5px")
+            .attr("x1", xScale(1996)+100)
+            .attr("y1", yScale(30.33489281))
+            .attr("x2", xScale(2005))
+            .attr("y2", yScale(56.32864573)+200);
+
+        group
+            .append("line")
+            .attr("opacity", 1)
+            .attr("style", "stroke:rgb(0,0,0);stroke-width:0.5px")
+            .attr("x1", xScale(1985)+100)
+            .attr("y1", yScale(40.33489281)+100)
+            .attr("x2", xScale(2005))
+            .attr("y2", yScale(56.32864573)+200);
+
+      }
+
+      function getId(label) {
+        return label.toLowerCase().replace(/[^a-zA-Z0-9]+/g, "");
+      }
+
+      var color_index = 0;
+
+      function drawMaleAndFemale(country, color) {
+          selected_countries.add(country);
+          console.log(male.get(country));
+          console.log(female.get(country));
+          if(!color) {
+            const color_category = d3.schemeCategory20;
+            color = color_category[(color_index++)%20];
+          }
+          drawGraph(male.get(country), color, 0, 'M:'+country, country);
+          drawGraph(female.get(country), color, 2, 'F:'+country, country);        
+      }
+      function drawGraph(dataset1, color, brighter, label, country) {
+        //console.log(dataset1);
+        // Step 3
+        var svg = d3.select("svg"),
+            margin = 200,
+            width = svg.attr("width") - margin, //300
+            height = svg.attr("height") - margin //200
+
+        // Step 4
+        xScale = d3.scaleLinear().domain([1960, 2020]).range([0, width]),
+            yScale = d3.scaleLinear().domain([15, 90]).range([height, 0]);
+
+        var g = svg.append("g")
+            .attr("transform", "translate(" + 100 + "," + 100 + ")");
+
+        // Step 5
+        // Title
+        svg.append('text')
+        .attr('x', width/2 + 100)
+        .attr('y', 100)
+        .attr('text-anchor', 'middle')
+        .style('font-family', 'Helvetica')
+        .style('font-size', 20);
+
+        // X label
+        svg.append('text')
+        .attr('x', width/2 + 100)
+        .attr('y', height - 15 + 150)
+        .attr('text-anchor', 'middle')
+        .style('font-family', 'Helvetica')
+        .style('font-size', 12)
+        .text('Year');
+
+        // Y label
+        svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('transform', 'translate(60,' + height + ')rotate(-90)')
+        .style('font-family', 'Helvetica')
+        .style('font-size', 12)
+        .text('Survival to 65 (% of cohort');
+
+        // Step 6
+        g.append("g")
+         .attr("transform", "translate(0," + height + ")")
+         .call(d3.axisBottom(xScale));
+
+        g.append("g")
+         .call(d3.axisLeft(yScale));
+
+      // Define the div for the tooltip
+          var tooltipdiv = d3.select("body").append("div")
+              .attr("class", "tooltip")
+              .style("opacity", 0);
+
+        // Step 7
+        var main_group = svg.append('g')
+          .attr('id', getId(label));
+        main_group.append('g')
+        .selectAll("dot")
+        .data(dataset1)
+        .enter()
+        .append("circle")
+        .attr("cx", function (d) { return xScale(d[0]); } )
+        .attr("cy", function (d) { return yScale(d[1]); } )
+        .attr("r", 4)
+        .attr("transform", "translate(" + 100 + "," + 100 + ")")
+        .style("fill", d3.color(color).brighter(brighter))
+         .on("mouseover", function(d) {
+            //console.log(d3.event.pageX);
+            //console.log(d3.event.pageY);
+            tooltipdiv.transition()
+                .style("opacity", 1);
+            tooltipdiv.html( "</b><br/>Year:<b> " + d[0] + " </b><br/>Survival Rate:<b> "  + d[1] + "</b>")
+                .style("left", (d3.event.pageX) + "px")
+                .style("top", (d3.event.pageY - 70) + "px");
+        })
+        .on("mouseout", function(d) {
+            tooltipdiv.transition()
+                .style("opacity", 0);
+        });
+
+        // Step 8
+        var line = d3.line()
+        .x(function(d) { return xScale(d[0]); })
+        .y(function(d) { return yScale(d[1]); })
+        .curve(d3.curveMonotoneX)
+
+        main_group.append("path")
+        .datum(dataset1)
+        .attr("class", "line")
+        .attr("transform", "translate(" + 100 + "," + 100 + ")")
+        .attr("d", line)
+        .text('sdsvd')
+        .style("fill", "none")
+        .style("stroke", color)
+        .style("stroke-width", "1");
+
+        main_group.append("text")
+        .attr("transform", "translate("  + xScale(dataset1[dataset1.length - 1][0] + 7) + "," + yScale(dataset1[dataset1.length - 1][1]-17.5) + ")")
+        .attr("dy", ".35em")
+        .attr("text-anchor", "start")
+        .style("fill", 'black')
+        .style('font','15px Helvetica')
+        .text(label);
+
+
+    }
+
+
+      // Load pages
+      function loadPage1() {
+          window.location.replace("./index.html?pageid=1");
+      }
+      function loadPage2() {
+          window.location.replace("./index.html?pageid=2");
+      }
+      function loadPage3() {
+          window.location.replace("./index.html?pageid=3");
+      }
+      function loadPage4() {
+          window.location.replace("./index.html?pageid=4");
+      }
+
+</script>
+
+</body>
+</html>
